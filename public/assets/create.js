@@ -5,12 +5,26 @@ const $ = (id) => document.getElementById(id);
 const els = {
   form: $('form'), result: $('result'), note: $('note'), bytes: $('bytes'), maxBytes: $('maxBytes'),
   ttl: $('ttl'), burn: $('burn'), create: $('create'), formError: $('formError'),
-  link: $('link'), key: $('key'), copyLink: $('copyLink'), copyKey: $('copyKey'),
+  link: $('link'), linkNoKey: $('linkNoKey'), key: $('key'),
+  copyLink: $('copyLink'), copyLinkNoKey: $('copyLinkNoKey'), copyKey: $('copyKey'),
   expiry: $('expiry'), copied: $('copied'), again: $('again')
 };
 
 const MAX_BYTES = Number(els.maxBytes.textContent);
 const encoder = new TextEncoder();
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleString('pl-PL', { dateStyle: 'long', timeStyle: 'short' });
+}
+
+function renderExpiry(data) {
+  const date = document.createElement('strong');
+  date.className = 'expiry-date';
+  date.textContent = formatDate(data.expiresAt);
+  const prefix = data.burnAfterRead ? 'Wiadomość jednorazowa. Wygaśnie ' : 'Wiadomość wielokrotna. Wygaśnie ';
+  const suffix = data.burnAfterRead ? ', jeśli nie zostanie wcześniej odczytana.' : '.';
+  els.expiry.replaceChildren(prefix, date, suffix);
+}
 
 function showError(message) {
   els.formError.textContent = message;
@@ -61,12 +75,10 @@ async function createNote() {
 
     const data = await response.json();
     const keyStr = toBase64Url(rawKey);
-    els.link.value = `${location.origin}/${data.id}#${keyStr}`;
+    els.linkNoKey.value = `${location.origin}/${data.id}`;
+    els.link.value = `${els.linkNoKey.value}#${keyStr}`;
     els.key.value = keyStr;
-    const expires = new Date(data.expiresAt).toLocaleString('pl-PL');
-    els.expiry.textContent = data.burnAfterRead
-      ? `Wiadomość jednorazowa. Wygaśnie ${expires}, jeśli nie zostanie wcześniej odczytana.`
-      : `Wiadomość wielokrotna. Wygaśnie ${expires}.`;
+    renderExpiry(data);
 
     els.note.value = '';
     updateCounter();
@@ -81,8 +93,9 @@ async function createNote() {
 
 function reset() {
   els.link.value = '';
+  els.linkNoKey.value = '';
   els.key.value = '';
-  els.expiry.textContent = '';
+  els.expiry.replaceChildren();
   els.result.classList.add('hidden');
   els.form.classList.remove('hidden');
   els.note.focus();
@@ -95,6 +108,7 @@ if (!hasWebCrypto()) {
   els.note.addEventListener('input', updateCounter);
   els.create.addEventListener('click', createNote);
   els.copyLink.addEventListener('click', () => copyToClipboard(els.link));
+  els.copyLinkNoKey.addEventListener('click', () => copyToClipboard(els.linkNoKey));
   els.copyKey.addEventListener('click', () => copyToClipboard(els.key));
   els.again.addEventListener('click', reset);
   updateCounter();

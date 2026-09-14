@@ -190,7 +190,7 @@ test('root redirects to create and healthz responds', async (t) => {
   assert.deepEqual(health.json(), { ok: true });
 });
 
-test('security headers are present, assets are cacheable', async (t) => {
+test('security headers are present, assets revalidate', async (t) => {
   const { app } = await buildTestApp();
   t.after(() => app.close());
   for (const url of ['/create', `/${SOME_UUID}`, `/api/notes/${SOME_UUID}`]) {
@@ -204,6 +204,6 @@ test('security headers are present, assets are cacheable', async (t) => {
   }
   const asset = await app.inject({ method: 'GET', url: '/assets/app.css' });
   assert.equal(asset.statusCode, 200);
-  assert.match(asset.headers['cache-control'], /max-age=3600/);
+  assert.equal(asset.headers['cache-control'], 'no-cache');
   assert.match(asset.headers['content-security-policy'], /default-src 'none'/);
 });

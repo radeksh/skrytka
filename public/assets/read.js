@@ -95,7 +95,10 @@ async function reveal() {
   els.plaintext.textContent = text;
   els.burnNotice.classList.toggle('hidden', !data.burnAfterRead);
   if (!data.burnAfterRead) {
-    els.expiry.textContent = `Wiadomość pozostanie dostępna do ${new Date(data.expiresAt).toLocaleString('pl-PL')}.`;
+    const date = document.createElement('strong');
+    date.className = 'expiry-date';
+    date.textContent = new Date(data.expiresAt).toLocaleString('pl-PL', { dateStyle: 'long', timeStyle: 'short' });
+    els.expiry.replaceChildren('Wiadomość pozostanie dostępna do ', date, '.');
     els.expiry.classList.remove('hidden');
   }
   els.welcome.classList.add('hidden');

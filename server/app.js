@@ -46,8 +46,7 @@ export async function buildApp(config, { now = Date.now } = {}) {
     wildcard: false,
     index: false,
     list: false,
-    cacheControl: true,
-    maxAge: '1h',
+    cacheControl: false,
     etag: true
   });
 

@@ -3,7 +3,7 @@ const CSP = [
   "script-src 'self'",
   "style-src 'self'",
   "connect-src 'self'",
-  "img-src 'self'",
+  "img-src 'self' data:",
   "base-uri 'none'",
   "form-action 'none'",
   "frame-ancestors 'none'"
@@ -19,8 +19,6 @@ export function registerSecurityHeaders(app) {
     reply.header('Cross-Origin-Opener-Policy', 'same-origin');
     reply.header('Cross-Origin-Resource-Policy', 'same-origin');
     reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    if (!request.url.startsWith('/assets/')) {
-      reply.header('Cache-Control', 'no-store');
-    }
+    reply.header('Cache-Control', request.url.startsWith('/assets/') ? 'no-cache' : 'no-store');
   });
 }

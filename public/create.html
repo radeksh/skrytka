@@ -6,12 +6,16 @@
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
   <title>Skrytka - nowa wiadomość</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%97%9D%EF%B8%8F%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
   <main class="card">
     <h1>Skrytka</h1>
-    <p class="lead">Wpisz poufną treść. Zostanie zaszyfrowana w Twojej przeglądarce, a serwer otrzyma wyłącznie szyfrogram. Klucz znajdzie się tylko w linku, który wyślesz odbiorcy.</p>
+    <details class="howto">
+      <summary>Jak to działa?</summary>
+      <p>Wpisz poufną treść. Zostanie zaszyfrowana w Twojej przeglądarce, a serwer otrzyma wyłącznie szyfrogram. Klucz znajdzie się tylko w linku, który wyślesz odbiorcy. Serwer nigdy nie widzi treści ani klucza.</p>
+    </details>
 
     <section id="form">
       <label for="note">Treść wiadomości</label>
@@ -40,21 +44,27 @@
 
     <section id="result" class="hidden">
       <h2>Link gotowy</h2>
-      <p class="hint">Wyślij odbiorcy cały link. Klucz jest częścią po znaku # i nigdy nie trafia na serwer. Możesz też przesłać link bez klucza jednym kanałem, a sam klucz drugim.</p>
+      <p id="expiry" class="expiry"></p>
 
       <label for="link">Pełny link</label>
       <div class="copyrow">
         <input id="link" type="text" readonly>
-        <button id="copyLink" type="button">Kopiuj link</button>
+        <button id="copyLink" type="button">Kopiuj</button>
+      </div>
+      <p class="hint">Wyślij odbiorcy cały link. Klucz jest częścią po znaku # i nigdy nie trafia na serwer.</p>
+
+      <label for="linkNoKey">Link bez klucza</label>
+      <div class="copyrow">
+        <input id="linkNoKey" type="text" readonly>
+        <button id="copyLinkNoKey" type="button">Kopiuj</button>
       </div>
 
       <label for="key">Sam klucz</label>
       <div class="copyrow">
         <input id="key" type="text" readonly>
-        <button id="copyKey" type="button">Kopiuj klucz</button>
+        <button id="copyKey" type="button">Kopiuj</button>
       </div>
-
-      <p class="hint" id="expiry"></p>
+      <p class="hint">Do wysyłki dwoma kanałami: link bez klucza jednym, klucz drugim. Odbiorca wklei klucz na stronie.</p>
       <p class="ok hidden" id="copied">Skopiowano do schowka.</p>
       <button id="again" type="button">Nowa wiadomość</button>
     </section>

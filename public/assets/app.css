@@ -10,6 +10,7 @@
   --warn-bg: #fff8e6;
   --warn-border: #f0c36d;
   --ok: #1a7f37;
+  --amber: #b45309;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -24,6 +25,7 @@
     --warn-bg: #2a2110;
     --warn-border: #7a5a1a;
     --ok: #3fb950;
+    --amber: #f5a524;
   }
 }
 
@@ -50,6 +52,9 @@ h1 { margin: 0 0 12px; font-size: 1.6rem; }
 h2 { margin: 24px 0 8px; font-size: 1.2rem; }
 
 .lead { color: var(--muted); margin: 0 0 20px; }
+.howto { margin: 0 0 20px; color: var(--muted); font-size: 0.95rem; }
+.howto summary { cursor: pointer; color: var(--primary); font-weight: 600; }
+.howto p { margin: 8px 0 0; }
 .hint { color: var(--muted); font-size: 0.9rem; margin: 6px 0 16px; }
 .keyhint { font-weight: 600; margin: 0 0 12px; }
 
@@ -105,6 +110,9 @@ pre {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.95rem;
 }
+
+.expiry { margin: 0 0 16px; color: var(--muted); }
+.expiry-date { color: var(--amber); font-weight: 700; }
 
 .warn {
   margin: 20px 0 0;
