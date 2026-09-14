@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { B64URL_PATTERN, IV_B64URL_LENGTH, MIN_CIPHERTEXT_B64URL_LENGTH, TTL_OPTIONS, UUID_V4_RE } from '../constants.js';
+import { B64URL_PATTERN, IV_B64URL_LENGTH, MIN_CIPHERTEXT_B64URL_LENGTH, TTL_OPTIONS, UUID_V4_RE } from '../../shared/constants.js';
 
 export async function notesRoutes(app, { db, config, allowlistHook }) {
   const createSchema = {

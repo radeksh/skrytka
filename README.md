@@ -27,6 +27,28 @@ Share passwords, tokens and other secrets with people. Skrytka encrypts the mess
 4. The recipient opens the link and sees a welcome screen. If the fragment contains a key it is pre-filled into a password field with a show/hide toggle; otherwise the recipient is asked to paste it. Nothing is fetched yet.
 5. On click the browser fetches the ciphertext, decrypts it locally and shows the text. One-time notes are deleted by that request; the key is also removed from the address bar.
 
+## Running it
+
+Two interchangeable server layers share the same frontend in `public/`.
+
+**Container** (Node.js, SQLite in `/data`): configuration through environment variables, see `.env.example`.
+
+```bash
+docker run -d -p 3000:3000 -v skrytka-data:/data ghcr.io/radeksh/skrytka:latest
+```
+
+**Cloudflare Workers** (D1, Static Assets): this is how the public instance runs. Per-IP rate limiting and a cron purge of expired notes are configured in `wrangler.jsonc`. On the Workers Free plan there is no overage billing; past the daily limits requests fail instead of generating cost.
+
+```bash
+npx wrangler d1 create skrytka        # once; paste database_id into wrangler.jsonc
+npx wrangler d1 migrations apply skrytka --remote
+npx wrangler deploy
+```
+
+Pushes to `main` deploy automatically through `.github/workflows/deploy.yml`, which needs the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets. Wrangler requires Node.js 22.
+
+Creation (`/create`, `POST /api/create`) and reading (`/<uuid>`, `GET /api/notes/<uuid>`) live under disjoint paths on purpose, so access to creation can be restricted by path at a proxy, ingress or Cloudflare WAF rule.
+
 ## License
 
 MIT

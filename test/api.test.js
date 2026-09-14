@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { UUID_V4_RE } from '../server/constants.js';
+import { UUID_V4_RE } from '../shared/constants.js';
 import { ALLOWED_IP, DENIED_IP, VALID_BODY, buildTestApp, getNote, postCreate } from './helpers.js';
 
 const SOME_UUID = '3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f';

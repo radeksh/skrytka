@@ -9,6 +9,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /build/node_modules ./node_modules
 COPY package.json ./
+COPY shared/ ./shared/
 COPY server/ ./server/
 COPY public/ ./public/
 RUN adduser -D -u 1001 appuser && mkdir -p /data && chown 1001:1001 /data

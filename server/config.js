@@ -1,5 +1,5 @@
 import { parseCidrList } from './allowlist.js';
-import { GCM_TAG_BYTES } from './constants.js';
+import { GCM_TAG_BYTES } from '../shared/constants.js';
 
 const LOG_LEVELS = new Set(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']);
 

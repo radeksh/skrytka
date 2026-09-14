@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { UUID_V4_RE } from '../constants.js';
+import { UUID_V4_RE } from '../../shared/constants.js';
 
 const publicDir = fileURLToPath(new URL('../../public/', import.meta.url));
 
