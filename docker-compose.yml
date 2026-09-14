@@ -1,0 +1,16 @@
+services:
+  skrytka:
+    image: ghcr.io/radeksh/skrytka:latest
+    ports:
+      - "3000:3000"
+    environment:
+      DB_PATH: /data/skrytka.db
+      TRUST_PROXY: ""
+      CREATE_ALLOWED_CIDRS: ""
+      LOG_LEVEL: info
+    volumes:
+      - skrytka-data:/data
+    restart: unless-stopped
+
+volumes:
+  skrytka-data:

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Skrytka - wiadomość</title>
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <main class="card">
+    <h1>Skrytka</h1>
+
+    <section id="welcome">
+      <p class="lead">Ktoś zostawił Ci wiadomość w skrzynce...</p>
+      <p id="keyHint" class="keyhint"></p>
+
+      <label for="key">Klucz deszyfrujący</label>
+      <div class="copyrow">
+        <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Wklej klucz">
+        <button id="toggleKey" type="button" aria-label="Pokaż lub ukryj klucz">Pokaż</button>
+      </div>
+      <p id="keyError" class="error hidden">Klucz ma nieprawidłowy format.</p>
+
+      <p class="warn">Jeśli to wiadomość jednorazowa, po odczytaniu zostanie trwale usunięta z serwera. Odczytaj ją, gdy możesz od razu zapisać jej treść.</p>
+      <button id="reveal" type="button" class="primary" disabled>Odczytaj wiadomość</button>
+    </section>
+
+    <section id="content" class="hidden">
+      <h2>Treść wiadomości</h2>
+      <pre id="plaintext"></pre>
+      <div class="actions">
+        <button id="copy" type="button">Kopiuj treść</button>
+        <span id="copied" class="ok hidden">Skopiowano.</span>
+      </div>
+      <p id="burnNotice" class="warn hidden">Ta wiadomość została usunięta z serwera i nie będzie dostępna ponownie. Zapisz ją teraz.</p>
+      <p id="expiry" class="hint hidden"></p>
+    </section>
+
+    <section id="error" class="hidden">
+      <p id="errorText" class="error"></p>
+    </section>
+  </main>
+  <script type="module" src="/assets/read.js"></script>
+</body>
+</html>

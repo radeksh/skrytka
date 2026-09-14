@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Skrytka - nowa wiadomość</title>
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <main class="card">
+    <h1>Skrytka</h1>
+    <p class="lead">Wpisz poufną treść. Zostanie zaszyfrowana w Twojej przeglądarce, a serwer otrzyma wyłącznie szyfrogram. Klucz znajdzie się tylko w linku, który wyślesz odbiorcy.</p>
+
+    <section id="form">
+      <label for="note">Treść wiadomości</label>
+      <textarea id="note" rows="8" spellcheck="false" autocomplete="off" placeholder="Hasło, token, dane dostępowe..."></textarea>
+      <p class="hint"><span id="bytes">0</span> / <span id="maxBytes">65536</span> bajtów</p>
+
+      <div class="row">
+        <div>
+          <label for="ttl">Ważność</label>
+          <select id="ttl">
+            <option value="1h">1 godzina</option>
+            <option value="24h" selected>24 godziny</option>
+            <option value="7d">7 dni</option>
+            <option value="30d">30 dni</option>
+          </select>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="burn" checked>
+          <label for="burn">Jednorazowa (usuwana po pierwszym odczycie)</label>
+        </div>
+      </div>
+
+      <button id="create" type="button" class="primary">Utwórz link</button>
+      <p id="formError" class="error hidden"></p>
+    </section>
+
+    <section id="result" class="hidden">
+      <h2>Link gotowy</h2>
+      <p class="hint">Wyślij odbiorcy cały link. Klucz jest częścią po znaku # i nigdy nie trafia na serwer. Możesz też przesłać link bez klucza jednym kanałem, a sam klucz drugim.</p>
+
+      <label for="link">Pełny link</label>
+      <div class="copyrow">
+        <input id="link" type="text" readonly>
+        <button id="copyLink" type="button">Kopiuj link</button>
+      </div>
+
+      <label for="key">Sam klucz</label>
+      <div class="copyrow">
+        <input id="key" type="text" readonly>
+        <button id="copyKey" type="button">Kopiuj klucz</button>
+      </div>
+
+      <p class="hint" id="expiry"></p>
+      <p class="ok hidden" id="copied">Skopiowano do schowka.</p>
+      <button id="again" type="button">Nowa wiadomość</button>
+    </section>
+  </main>
+  <script type="module" src="/assets/create.js"></script>
+</body>
+</html>
