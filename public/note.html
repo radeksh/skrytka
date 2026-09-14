@@ -14,8 +14,8 @@
     <h1>Skrytka</h1>
 
     <section id="welcome">
-      <p class="lead">Ktoś zostawił Ci wiadomość w skrzynce...</p>
-      <p id="keyHint" class="keyhint"></p>
+      <p class="lead">Ktoś zostawił Ci wiadomość w skrytce...</p>
+      <p id="keyHint" class="keyhint hidden"></p>
 
       <label for="key">Klucz deszyfrujący</label>
       <div class="copyrow">
@@ -24,7 +24,7 @@
       </div>
       <p id="keyError" class="error hidden">Klucz ma nieprawidłowy format.</p>
 
-      <p class="warn">Jeśli to wiadomość jednorazowa, po odczytaniu zostanie trwale usunięta z serwera. Odczytaj ją, gdy możesz od razu zapisać jej treść.</p>
+      <p id="burnWarn" class="warn hidden">To wiadomość jednorazowa, po odczytaniu zostanie trwale usunięta z serwera. Odczytaj ją, gdy możesz od razu zapisać jej treść.</p>
       <button id="reveal" type="button" class="primary" disabled>Odczytaj wiadomość</button>
     </section>
 

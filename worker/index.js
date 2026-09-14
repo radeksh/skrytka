@@ -108,6 +108,16 @@ async function createNote(request, env) {
   return json(201, { id, expiresAt: new Date(expiresAt).toISOString(), burnAfterRead: body.burnAfterRead });
 }
 
+async function noteInfo(request, env, id) {
+  if (!UUID_V4_RE.test(id)) return json(404, NOT_FOUND);
+  if (await rateLimited(env.READ_LIMITER, request)) return json(429, { error: 'too_many_requests' });
+  const row = await env.DB.prepare('SELECT burn_after_read, expires_at FROM notes WHERE id = ?1 AND expires_at > ?2')
+    .bind(id, Date.now())
+    .first();
+  if (!row) return json(404, NOT_FOUND);
+  return json(200, { burnAfterRead: row.burn_after_read === 1, expiresAt: new Date(row.expires_at).toISOString() });
+}
+
 async function readNote(request, env, id) {
   if (!UUID_V4_RE.test(id)) return json(404, NOT_FOUND);
   if (await rateLimited(env.READ_LIMITER, request)) return json(429, { error: 'too_many_requests' });
@@ -153,6 +163,9 @@ async function route(request, env) {
   if (path === '/create' && method === 'GET') return servePage(env, url, '/create.html');
   if (path === '/healthz' && method === 'GET') return json(200, { ok: true });
   if (path === '/api/create' && method === 'POST') return createNote(request, env);
+
+  const infoMatch = path.match(/^\/api\/notes\/([^/]+)\/info$/);
+  if (infoMatch && method === 'GET') return noteInfo(request, env, infoMatch[1]);
 
   const apiMatch = path.match(/^\/api\/notes\/([^/]+)$/);
   if (apiMatch && method === 'GET') return readNote(request, env, apiMatch[1]);

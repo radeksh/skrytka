@@ -38,6 +38,26 @@ test('read returns the stored ciphertext and burns the note', async (t) => {
   assert.equal(app.db.countNotes(), 0);
 });
 
+test('info endpoint reports type without consuming the note', async (t) => {
+  const { app, clock } = await buildTestApp();
+  t.after(() => app.close());
+  const { id } = (await postCreate(app)).json();
+  const info = await app.inject({ method: 'GET', url: `/api/notes/${id}/info` });
+  assert.equal(info.statusCode, 200);
+  assert.deepEqual(info.json(), { burnAfterRead: true, expiresAt: new Date(clock.t + 3_600_000).toISOString() });
+  assert.equal(info.headers['cache-control'], 'no-store');
+  assert.equal(app.db.countNotes(), 1);
+  assert.equal(app.db.raw.prepare('SELECT read_count FROM notes WHERE id = ?').get(id).read_count, 0);
+  assert.equal((await getNote(app, id)).statusCode, 200);
+  assert.equal((await app.inject({ method: 'GET', url: `/api/notes/${id}/info` })).statusCode, 404);
+  clock.t += 1;
+  const { id: multi } = (await postCreate(app, { ...VALID_BODY, burnAfterRead: false })).json();
+  assert.equal((await app.inject({ method: 'GET', url: `/api/notes/${multi}/info` })).json().burnAfterRead, false);
+  clock.t += 3_600_001;
+  assert.equal((await app.inject({ method: 'GET', url: `/api/notes/${multi}/info` })).statusCode, 404);
+  assert.equal((await app.inject({ method: 'GET', url: '/api/notes/not-a-uuid/info' })).statusCode, 404);
+});
+
 test('concurrent reads of a burn note yield exactly one success', async (t) => {
   const { app } = await buildTestApp();
   t.after(() => app.close());

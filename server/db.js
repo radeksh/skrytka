@@ -39,6 +39,7 @@ export function openDatabase(dbPath) {
     WHERE id = ? AND burn_after_read = 0 AND expires_at > ?
     RETURNING ciphertext, iv, expires_at
   `);
+  const infoStmt = db.prepare('SELECT burn_after_read, expires_at FROM notes WHERE id = ? AND expires_at > ?');
   const deleteExpiredStmt = db.prepare('DELETE FROM notes WHERE expires_at <= ?');
   const countStmt = db.prepare('SELECT COUNT(*) AS n FROM notes');
 
@@ -53,6 +54,11 @@ export function openDatabase(dbPath) {
   return {
     insertNote({ id, ciphertext, iv, burnAfterRead, createdAt, expiresAt }) {
       insertStmt.run({ id, ciphertext, iv, burnAfterRead: burnAfterRead ? 1 : 0, createdAt, expiresAt });
+    },
+    getNoteInfo(id, now) {
+      const row = infoStmt.get(id, now);
+      if (!row) return null;
+      return { burnAfterRead: row.burn_after_read === 1, expiresAt: row.expires_at };
     },
     consumeNote(id, now) {
       const row = consumeTx(id, now);

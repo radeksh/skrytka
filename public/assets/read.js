@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 const els = {
   welcome: $('welcome'), content: $('content'), error: $('error'), errorText: $('errorText'),
   keyHint: $('keyHint'), key: $('key'), toggleKey: $('toggleKey'), keyError: $('keyError'),
-  reveal: $('reveal'), plaintext: $('plaintext'), copy: $('copy'), copied: $('copied'),
+  reveal: $('reveal'), burnWarn: $('burnWarn'), plaintext: $('plaintext'), copy: $('copy'), copied: $('copied'),
   burnNotice: $('burnNotice'), expiry: $('expiry')
 };
 
@@ -50,6 +50,21 @@ async function copyPlaintext() {
     selection.removeAllRanges();
     selection.addRange(range);
   }
+}
+
+async function loadInfo() {
+  let response;
+  try {
+    response = await fetch(`/api/notes/${noteId}/info`, { cache: 'no-store' });
+  } catch {
+    return;
+  }
+  if (response.status === 404) {
+    return showFatal('Wiadomość nie istnieje, wygasła lub została już odczytana. Jeśli to nie Ty ją odczytałeś, skontaktuj się z nadawcą.');
+  }
+  if (!response.ok) return;
+  const info = await response.json();
+  els.burnWarn.classList.toggle('hidden', !info.burnAfterRead);
 }
 
 async function reveal() {
@@ -115,13 +130,14 @@ function init() {
 
   const fragment = location.hash.replace(/^#/, '').trim();
   if (isValidKeyString(fragment)) {
-    els.keyHint.textContent = 'I wygląda na to, że masz klucz!';
     els.key.value = fragment;
   } else {
     els.keyHint.textContent = 'Do odczytania potrzebny jest klucz. Wklej go poniżej.';
+    els.keyHint.classList.remove('hidden');
     if (fragment) els.keyError.classList.remove('hidden');
   }
   validateKey();
+  loadInfo();
 
   els.key.addEventListener('input', validateKey);
   els.toggleKey.addEventListener('click', toggleKeyVisibility);

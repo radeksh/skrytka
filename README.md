@@ -14,7 +14,7 @@ Share passwords, tokens and other secrets with people. Skrytka encrypts the mess
 
 - The server never sees the plaintext or the key. A database leak exposes ciphertext only.
 - Keys are per note, 32 random bytes from `crypto.getRandomValues`, 12-byte IV, 128-bit GCM tag.
-- The note page `/<uuid>` is fully static and does not query the database, so it does not reveal whether a note exists.
+- The note page `/<uuid>` is static. On load it only asks `/api/notes/<uuid>/info` whether the note is one-time, which never consumes it.
 - "Does not exist", "expired" and "already read" all return the same `404`.
 - Consuming a one-time note is a single `DELETE ... RETURNING`.
 - Strict CSP without inline scripts or styles, `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, no CORS.
@@ -24,7 +24,7 @@ Share passwords, tokens and other secrets with people. Skrytka encrypts the mess
 1. The sender types a message at `/create`. The browser generates a random 256-bit AES-GCM key, encrypts the text and posts only `{ ciphertext, iv }` (base64url) to the server.
 2. The server stores the ciphertext under a random UUID with the chosen lifetime and returns the id.
 3. The browser builds the link `https://host/<uuid>#<key>`.
-4. The recipient opens the link and sees a welcome screen. If the fragment contains a key it is pre-filled into a password field with a show/hide toggle; otherwise the recipient is asked to paste it. Nothing is fetched yet.
+4. The recipient opens the link and sees a welcome screen. If the fragment contains a key it is pre-filled into a password field with a show/hide toggle; otherwise the recipient is asked to paste it. One-time notes show a warning before reading. The ciphertext is not fetched yet.
 5. On click the browser fetches the ciphertext, decrypts it locally and shows the text. One-time notes are deleted by that request; the key is also removed from the address bar.
 
 ## Running it

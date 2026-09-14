@@ -30,6 +30,14 @@ export async function notesRoutes(app, { db, config, allowlistHook }) {
     return reply.code(201).send({ id, expiresAt: new Date(expiresAt).toISOString(), burnAfterRead });
   });
 
+  app.get('/api/notes/:id/info', async (request, reply) => {
+    const { id } = request.params;
+    if (!UUID_V4_RE.test(id)) return reply.code(404).send({ error: 'not_found' });
+    const info = db.getNoteInfo(id, app.now());
+    if (!info) return reply.code(404).send({ error: 'not_found' });
+    return reply.send({ burnAfterRead: info.burnAfterRead, expiresAt: new Date(info.expiresAt).toISOString() });
+  });
+
   app.get('/api/notes/:id', async (request, reply) => {
     const { id } = request.params;
     if (!UUID_V4_RE.test(id)) return reply.code(404).send({ error: 'not_found' });
