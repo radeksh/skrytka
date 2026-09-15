@@ -1,5 +1,7 @@
 # Skrytka
 
+Live demo: https://skrytka.radek.sh
+
 Share passwords, tokens and other secrets with people. Skrytka encrypts the message in the sender's browser, stores only the ciphertext and hands the recipient a link that carries the decryption key in its fragment. The server never sees the plaintext or the key, and a note can be read exactly once, or for a limited time, and then it is gone.
 
 **Skrytka** (pronounced *skrit-ka*) is Polish for a small hidden compartment: the locked drawer in a desk, a safe deposit box, or the dead drop where a spy leaves a package for someone else to collect. You put something inside, lock it, and pass the key to the one person who is supposed to open it. That is exactly what this service does.
