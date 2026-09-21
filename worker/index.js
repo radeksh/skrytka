@@ -1,20 +1,35 @@
 import {
-  B64URL_RE,
+  FILE_OVERHEAD_BYTES,
+  FILE_TOKEN_RE,
+  FILE_TOKEN_TTL_MS,
+  FRAME_HEADER_BYTES,
+  FRAME_META_MAX_BYTES,
   GCM_TAG_BYTES,
-  IV_B64URL_LENGTH,
-  MIN_CIPHERTEXT_B64URL_LENGTH,
+  NOTE_FRAME_CONTENT_TYPE,
   TTL_OPTIONS,
   UUID_V4_RE
 } from '../shared/constants.js';
 import { SECURITY_HEADERS, cacheControlFor } from '../shared/securityHeaders.js';
+import { isValidCreateMeta, parseFrameHeader } from '../shared/validate.js';
 
 const DEFAULT_MAX_NOTE_BYTES = 65_536;
+const DEFAULT_MAX_UPLOAD_BYTES = 10_485_760;
+const DEFAULT_FILE_QUOTA_BYTES = 5_368_709_120;
 const NOT_FOUND = { error: 'not_found' };
 
 function limits(env) {
   const maxNoteBytes = Number.parseInt(env.MAX_NOTE_BYTES ?? '', 10) || DEFAULT_MAX_NOTE_BYTES;
   const maxCiphertextB64Length = Math.ceil(((maxNoteBytes + GCM_TAG_BYTES) * 4) / 3);
-  return { maxCiphertextB64Length, bodyLimit: maxCiphertextB64Length + 1024 };
+  const maxUploadRaw = Number.parseInt(env.MAX_UPLOAD_BYTES ?? '', 10);
+  const maxUploadBytes = Number.isNaN(maxUploadRaw) ? DEFAULT_MAX_UPLOAD_BYTES : maxUploadRaw;
+  const quotaRaw = Number.parseInt(env.FILE_QUOTA_BYTES ?? '', 10);
+  return {
+    maxCiphertextB64Length,
+    bodyLimit: maxCiphertextB64Length + 1024,
+    maxUploadBytes,
+    uploadBodyLimit: FRAME_HEADER_BYTES + FRAME_META_MAX_BYTES + maxUploadBytes + FILE_OVERHEAD_BYTES,
+    fileQuotaBytes: Number.isNaN(quotaRaw) ? DEFAULT_FILE_QUOTA_BYTES : quotaRaw
+  };
 }
 
 function finalize(response, pathname) {
@@ -67,55 +82,142 @@ async function readBodyLimited(request, limit) {
   return new TextDecoder().decode(merged);
 }
 
-function validateCreate(body, maxCiphertextB64Length) {
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) return false;
-  const keys = Object.keys(body);
-  if (keys.length !== 4) return false;
-  const { ciphertext, iv, ttl, burnAfterRead } = body;
-  if (typeof ciphertext !== 'string' || ciphertext.length < MIN_CIPHERTEXT_B64URL_LENGTH || ciphertext.length > maxCiphertextB64Length || !B64URL_RE.test(ciphertext)) return false;
-  if (typeof iv !== 'string' || iv.length !== IV_B64URL_LENGTH || !B64URL_RE.test(iv)) return false;
-  if (typeof ttl !== 'string' || !Object.hasOwn(TTL_OPTIONS, ttl)) return false;
-  if (typeof burnAfterRead !== 'boolean') return false;
-  return true;
+function concat(a, b) {
+  const out = new Uint8Array(a.byteLength + b.byteLength);
+  out.set(a, 0);
+  out.set(b, a.byteLength);
+  return out;
+}
+
+async function readFrameHeader(body) {
+  const reader = body.getReader();
+  let buffer = new Uint8Array(0);
+  let metaLength = null;
+  for (;;) {
+    if (metaLength === null && buffer.byteLength >= FRAME_HEADER_BYTES) {
+      metaLength = parseFrameHeader(buffer.subarray(0, FRAME_HEADER_BYTES));
+      if (metaLength === 0 || metaLength > FRAME_META_MAX_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+    }
+    if (metaLength !== null && buffer.byteLength >= FRAME_HEADER_BYTES + metaLength) break;
+    const { value, done } = await reader.read();
+    if (done) return null;
+    buffer = concat(buffer, value);
+  }
+  let meta;
+  try {
+    meta = JSON.parse(new TextDecoder().decode(buffer.subarray(FRAME_HEADER_BYTES, FRAME_HEADER_BYTES + metaLength)));
+  } catch {
+    await reader.cancel();
+    return null;
+  }
+  return { meta, metaLength, leftover: buffer.subarray(FRAME_HEADER_BYTES + metaLength), reader };
+}
+
+async function storeNote(env, meta, extra = {}) {
+  const id = crypto.randomUUID();
+  const createdAt = Date.now();
+  const expiresAt = createdAt + TTL_OPTIONS[meta.ttl];
+  await env.DB.prepare(
+    'INSERT INTO notes (id, ciphertext, iv, burn_after_read, created_at, expires_at, file_key, file_size) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)'
+  )
+    .bind(id, meta.ciphertext, meta.iv, meta.burnAfterRead ? 1 : 0, createdAt, expiresAt, extra.fileKey ?? null, extra.fileSize ?? null)
+    .run();
+  return json(201, { id, expiresAt: new Date(expiresAt).toISOString(), burnAfterRead: meta.burnAfterRead });
 }
 
 async function createNote(request, env) {
   if (await rateLimited(env.CREATE_LIMITER, request)) return json(429, { error: 'too_many_requests' });
   const contentType = request.headers.get('Content-Type') ?? '';
-  if (!/^application\/json\b/i.test(contentType)) return json(415, { error: 'unsupported_media_type' });
+  const cfg = limits(env);
 
-  const { maxCiphertextB64Length, bodyLimit } = limits(env);
-  const raw = await readBodyLimited(request, bodyLimit);
-  if (raw === null) return json(413, { error: 'payload_too_large' });
+  if (/^application\/json\b/i.test(contentType)) {
+    const raw = await readBodyLimited(request, cfg.bodyLimit);
+    if (raw === null) return json(413, { error: 'payload_too_large' });
+    let body;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return json(400, { error: 'bad_request' });
+    }
+    if (!isValidCreateMeta(body, cfg.maxCiphertextB64Length)) return json(400, { error: 'bad_request' });
+    return storeNote(env, body);
+  }
 
-  let body;
-  try {
-    body = JSON.parse(raw);
-  } catch {
+  if (!contentType.startsWith(NOTE_FRAME_CONTENT_TYPE)) return json(415, { error: 'unsupported_media_type' });
+  if (!env.FILES || cfg.maxUploadBytes === 0) return json(415, { error: 'uploads_disabled' });
+
+  const contentLength = Number(request.headers.get('Content-Length'));
+  if (!Number.isInteger(contentLength) || contentLength <= 0) return json(411, { error: 'length_required' });
+  if (contentLength > cfg.uploadBodyLimit) return json(413, { error: 'payload_too_large' });
+  if (!request.body) return json(400, { error: 'bad_request' });
+
+  const frame = await readFrameHeader(request.body);
+  if (!frame) return json(400, { error: 'bad_request' });
+  if (!isValidCreateMeta(frame.meta, cfg.maxCiphertextB64Length)) {
+    await frame.reader.cancel();
     return json(400, { error: 'bad_request' });
   }
-  if (!validateCreate(body, maxCiphertextB64Length)) return json(400, { error: 'bad_request' });
 
-  const id = crypto.randomUUID();
-  const createdAt = Date.now();
-  const expiresAt = createdAt + TTL_OPTIONS[body.ttl];
-  await env.DB.prepare(
-    'INSERT INTO notes (id, ciphertext, iv, burn_after_read, created_at, expires_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
-  )
-    .bind(id, body.ciphertext, body.iv, body.burnAfterRead ? 1 : 0, createdAt, expiresAt)
-    .run();
+  const fileLength = contentLength - FRAME_HEADER_BYTES - frame.metaLength;
+  if (fileLength < FILE_OVERHEAD_BYTES) {
+    await frame.reader.cancel();
+    return json(400, { error: 'bad_request' });
+  }
+  if (fileLength > cfg.maxUploadBytes + FILE_OVERHEAD_BYTES) {
+    await frame.reader.cancel();
+    return json(413, { error: 'payload_too_large' });
+  }
 
-  return json(201, { id, expiresAt: new Date(expiresAt).toISOString(), burnAfterRead: body.burnAfterRead });
+  const usage = await env.DB.prepare('SELECT COALESCE(SUM(file_size), 0) AS used FROM notes').first();
+  if ((usage?.used ?? 0) + fileLength > cfg.fileQuotaBytes) {
+    await frame.reader.cancel();
+    return json(507, { error: 'storage_full' });
+  }
+
+  const fileKey = crypto.randomUUID();
+  const { readable, writable } = new FixedLengthStream(fileLength);
+  const pump = (async () => {
+    const writer = writable.getWriter();
+    try {
+      if (frame.leftover.byteLength) await writer.write(frame.leftover);
+      for (;;) {
+        const { value, done } = await frame.reader.read();
+        if (done) break;
+        await writer.write(value);
+      }
+      await writer.close();
+    } catch (err) {
+      await writer.abort(err).catch(() => {});
+      throw err;
+    }
+  })();
+
+  try {
+    await Promise.all([env.FILES.put(fileKey, readable), pump]);
+  } catch (err) {
+    console.error(JSON.stringify({ level: 'error', message: 'upload failed', detail: err.message }));
+    await env.FILES.delete(fileKey).catch(() => {});
+    return json(400, { error: 'bad_request' });
+  }
+  return storeNote(env, frame.meta, { fileKey, fileSize: fileLength });
 }
 
 async function noteInfo(request, env, id) {
   if (!UUID_V4_RE.test(id)) return json(404, NOT_FOUND);
   if (await rateLimited(env.READ_LIMITER, request)) return json(429, { error: 'too_many_requests' });
-  const row = await env.DB.prepare('SELECT burn_after_read, expires_at FROM notes WHERE id = ?1 AND expires_at > ?2')
+  const row = await env.DB.prepare('SELECT burn_after_read, expires_at, file_size FROM notes WHERE id = ?1 AND expires_at > ?2')
     .bind(id, Date.now())
     .first();
   if (!row) return json(404, NOT_FOUND);
-  return json(200, { burnAfterRead: row.burn_after_read === 1, expiresAt: new Date(row.expires_at).toISOString() });
+  return json(200, {
+    burnAfterRead: row.burn_after_read === 1,
+    expiresAt: new Date(row.expires_at).toISOString(),
+    hasFile: row.file_size !== null,
+    fileSize: row.file_size
+  });
 }
 
 async function readNote(request, env, id) {
@@ -124,25 +226,57 @@ async function readNote(request, env, id) {
 
   const now = Date.now();
   const burned = await env.DB.prepare(
-    'DELETE FROM notes WHERE id = ?1 AND burn_after_read = 1 AND expires_at > ?2 RETURNING ciphertext, iv, expires_at'
+    'DELETE FROM notes WHERE id = ?1 AND burn_after_read = 1 AND expires_at > ?2 RETURNING ciphertext, iv, expires_at, file_key, file_size'
   )
     .bind(id, now)
     .first();
   const row = burned
     ? { ...burned, burnAfterRead: true }
     : await env.DB.prepare(
-        'UPDATE notes SET read_count = read_count + 1, last_read_at = ?1 WHERE id = ?2 AND burn_after_read = 0 AND expires_at > ?1 RETURNING ciphertext, iv, expires_at'
+        'UPDATE notes SET read_count = read_count + 1, last_read_at = ?1 WHERE id = ?2 AND burn_after_read = 0 AND expires_at > ?1 RETURNING ciphertext, iv, expires_at, file_key, file_size'
       )
         .bind(now, id)
         .first()
         .then((r) => (r ? { ...r, burnAfterRead: false } : null));
 
   if (!row) return json(404, NOT_FOUND);
+
+  let file = null;
+  if (row.file_key) {
+    const token = crypto.randomUUID();
+    await env.DB.prepare('INSERT INTO file_tokens (token, note_id, file_key, burn, expires_at) VALUES (?1, ?2, ?3, ?4, ?5)')
+      .bind(token, id, row.file_key, row.burnAfterRead ? 1 : 0, now + FILE_TOKEN_TTL_MS)
+      .run();
+    file = { size: row.file_size, token };
+  }
+
   return json(200, {
     ciphertext: row.ciphertext,
     iv: row.iv,
     burnAfterRead: row.burnAfterRead,
-    expiresAt: new Date(row.expires_at).toISOString()
+    expiresAt: new Date(row.expires_at).toISOString(),
+    file
+  });
+}
+
+async function downloadFile(request, env, id, token) {
+  if (!UUID_V4_RE.test(id) || !FILE_TOKEN_RE.test(token)) return json(404, NOT_FOUND);
+  if (!env.FILES) return json(404, NOT_FOUND);
+  const grant = await env.DB.prepare(
+    'UPDATE file_tokens SET used = 1 WHERE token = ?1 AND note_id = ?2 AND used = 0 AND expires_at > ?3 RETURNING file_key'
+  )
+    .bind(token, id, Date.now())
+    .first();
+  if (!grant) return json(404, NOT_FOUND);
+  const object = await env.FILES.get(grant.file_key);
+  if (!object) return json(404, NOT_FOUND);
+  return new Response(object.body, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(object.size),
+      'Content-Disposition': 'attachment'
+    }
   });
 }
 
@@ -164,6 +298,9 @@ async function route(request, env) {
   if (path === '/healthz' && method === 'GET') return json(200, { ok: true });
   if (path === '/api/create' && method === 'POST') return createNote(request, env);
 
+  const fileMatch = path.match(/^\/api\/notes\/([^/]+)\/file\/([^/]+)$/);
+  if (fileMatch && method === 'GET') return downloadFile(request, env, fileMatch[1], fileMatch[2]);
+
   const infoMatch = path.match(/^\/api\/notes\/([^/]+)\/info$/);
   if (infoMatch && method === 'GET') return noteInfo(request, env, infoMatch[1]);
 
@@ -176,10 +313,24 @@ async function route(request, env) {
   return json(404, NOT_FOUND);
 }
 
-async function deleteExpired(env) {
-  const result = await env.DB.prepare('DELETE FROM notes WHERE expires_at <= ?1').bind(Date.now()).run();
-  const deleted = result.meta?.changes ?? 0;
-  if (deleted) console.log(JSON.stringify({ level: 'info', message: 'expired notes removed', deleted }));
+async function sweepExpired(env) {
+  const now = Date.now();
+  const orphanKeys = new Set();
+
+  const expiredNotes = await env.DB.prepare('SELECT file_key FROM notes WHERE expires_at <= ?1 AND file_key IS NOT NULL').bind(now).all();
+  for (const row of expiredNotes.results ?? []) orphanKeys.add(row.file_key);
+  const deletedNotes = (await env.DB.prepare('DELETE FROM notes WHERE expires_at <= ?1').bind(now).run()).meta?.changes ?? 0;
+
+  const expiredTokens = await env.DB.prepare('SELECT DISTINCT file_key FROM file_tokens WHERE expires_at <= ?1').bind(now).all();
+  await env.DB.prepare('DELETE FROM file_tokens WHERE expires_at <= ?1').bind(now).run();
+  for (const row of expiredTokens.results ?? []) {
+    const stillReferenced = await env.DB.prepare('SELECT 1 FROM notes WHERE file_key = ?1 LIMIT 1').bind(row.file_key).first();
+    if (!stillReferenced) orphanKeys.add(row.file_key);
+  }
+
+  const keys = [...orphanKeys];
+  if (keys.length && env.FILES) await env.FILES.delete(keys);
+  if (deletedNotes || keys.length) console.log(JSON.stringify({ level: 'info', message: 'expired data removed', deletedNotes, deletedFiles: keys.length }));
 }
 
 export default {
@@ -194,6 +345,6 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
-    ctx.waitUntil(deleteExpired(env));
+    ctx.waitUntil(sweepExpired(env));
   }
 };

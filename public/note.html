@@ -16,6 +16,7 @@
     <section id="welcome">
       <p class="lead">Ktoś zostawił Ci wiadomość w skrytce...</p>
       <p id="keyHint" class="keyhint hidden"></p>
+      <p id="fileHint" class="hint hidden"></p>
 
       <label for="key">Klucz deszyfrujący</label>
       <div class="copyrow">
@@ -30,10 +31,17 @@
 
     <section id="content" class="hidden">
       <h2>Treść wiadomości</h2>
-      <pre id="plaintext"></pre>
-      <div class="actions">
-        <button id="copy" type="button">Kopiuj treść</button>
-        <span id="copied" class="ok hidden">Skopiowano.</span>
+      <div id="textBox">
+        <pre id="plaintext"></pre>
+        <div class="actions">
+          <button id="copy" type="button">Kopiuj treść</button>
+          <span id="copied" class="ok hidden">Skopiowano.</span>
+        </div>
+      </div>
+      <div id="fileBox" class="hidden">
+        <p id="fileStatus" class="hint">Pobieranie i odszyfrowywanie załącznika...</p>
+        <a id="fileLink" class="button-link hidden" download></a>
+        <p id="fileError" class="error hidden"></p>
       </div>
       <p id="burnNotice" class="warn hidden">Ta wiadomość została usunięta z serwera i nie będzie dostępna ponownie. Zapisz ją teraz.</p>
       <p id="expiry" class="expiry hidden"></p>

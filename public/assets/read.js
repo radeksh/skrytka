@@ -1,12 +1,14 @@
 import { fromBase64Url } from './base64url.js';
-import { DecryptError, decryptText, hasWebCrypto, isValidKeyString } from './crypto.js';
+import { DecryptError, decryptBytes, decryptText, hasWebCrypto, isValidKeyString } from './crypto.js';
+import { formatBytes, unpackEnvelope } from './envelope.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 const $ = (id) => document.getElementById(id);
 const els = {
   welcome: $('welcome'), content: $('content'), error: $('error'), errorText: $('errorText'),
-  keyHint: $('keyHint'), key: $('key'), toggleKey: $('toggleKey'), keyError: $('keyError'),
+  keyHint: $('keyHint'), fileHint: $('fileHint'), key: $('key'), toggleKey: $('toggleKey'), keyError: $('keyError'),
+  textBox: $('textBox'), fileBox: $('fileBox'), fileStatus: $('fileStatus'), fileLink: $('fileLink'), fileError: $('fileError'),
   reveal: $('reveal'), burnWarn: $('burnWarn'), plaintext: $('plaintext'), copy: $('copy'), copied: $('copied'),
   burnNotice: $('burnNotice'), expiry: $('expiry')
 };
@@ -65,6 +67,40 @@ async function loadInfo() {
   if (!response.ok) return;
   const info = await response.json();
   els.burnWarn.classList.toggle('hidden', !info.burnAfterRead);
+  if (info.hasFile) {
+    els.fileHint.textContent = `Wiadomość zawiera zaszyfrowany załącznik (${formatBytes(info.fileSize)}).`;
+    els.fileHint.classList.remove('hidden');
+  }
+}
+
+async function loadFile(fileRef, meta, rawKey) {
+  els.fileBox.classList.remove('hidden');
+  let response;
+  try {
+    response = await fetch(`/api/notes/${noteId}/file/${fileRef.token}`, { cache: 'no-store' });
+  } catch {
+    response = null;
+  }
+  if (!response || !response.ok) {
+    els.fileStatus.classList.add('hidden');
+    els.fileError.textContent = 'Nie udało się pobrać załącznika. Odśwież stronę, jeśli wiadomość jest wielokrotna, albo poproś nadawcę o nową.';
+    els.fileError.classList.remove('hidden');
+    return;
+  }
+  try {
+    const plain = await decryptBytes(new Uint8Array(await response.arrayBuffer()), rawKey);
+    const blob = new Blob([plain], { type: meta?.type || 'application/octet-stream' });
+    const name = meta?.name || 'zalacznik.bin';
+    els.fileLink.href = URL.createObjectURL(blob);
+    els.fileLink.download = name;
+    els.fileLink.textContent = `Pobierz plik: ${name} (${formatBytes(blob.size)})`;
+    els.fileLink.classList.remove('hidden');
+    els.fileStatus.textContent = 'Załącznik odszyfrowany w przeglądarce. Zapisz go teraz.';
+  } catch {
+    els.fileStatus.classList.add('hidden');
+    els.fileError.textContent = 'Nie udało się odszyfrować załącznika.';
+    els.fileError.classList.remove('hidden');
+  }
 }
 
 async function reveal() {
@@ -94,9 +130,10 @@ async function reveal() {
   }
 
   const data = await response.json();
+  const rawKey = fromBase64Url(currentKey());
   let text;
   try {
-    text = await decryptText(data, fromBase64Url(currentKey()));
+    text = await decryptText(data, rawKey);
   } catch (err) {
     if (err instanceof DecryptError) {
       const extra = data.burnAfterRead
@@ -107,7 +144,9 @@ async function reveal() {
     return showFatal('Wystąpił nieoczekiwany błąd podczas odszyfrowywania.');
   }
 
-  els.plaintext.textContent = text;
+  const envelope = unpackEnvelope(text);
+  els.plaintext.textContent = envelope.text;
+  els.textBox.classList.toggle('hidden', envelope.text.length === 0);
   els.burnNotice.classList.toggle('hidden', !data.burnAfterRead);
   if (!data.burnAfterRead) {
     const date = document.createElement('strong');
@@ -121,6 +160,9 @@ async function reveal() {
 
   if (data.burnAfterRead) {
     history.replaceState(null, '', location.pathname);
+  }
+  if (data.file) {
+    await loadFile(data.file, envelope.file, rawKey);
   }
 }
 

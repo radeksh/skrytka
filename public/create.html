@@ -22,6 +22,13 @@
       <textarea id="note" rows="8" spellcheck="false" autocomplete="off" placeholder="Hasło, token, dane dostępowe..."></textarea>
       <p class="hint"><span id="bytes">0</span> / <span id="maxBytes">65536</span> bajtów</p>
 
+      <label for="file">Załącznik (opcjonalnie, do <span id="maxUploadLabel">10 MB</span>)</label>
+      <div class="filerow" data-max-upload="10485760">
+        <input type="file" id="file">
+        <button id="clearFile" type="button" class="hidden">Usuń</button>
+      </div>
+      <p class="hint" id="fileInfo">Plik zostanie zaszyfrowany w przeglądarce razem z nazwą.</p>
+
       <div class="row">
         <div>
           <label for="ttl">Ważność</label>

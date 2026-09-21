@@ -19,6 +19,9 @@
       "migrations_dir": "worker/migrations"
     }
   ],
+  "r2_buckets": [
+    { "binding": "FILES", "bucket_name": "skrytka-files" }
+  ],
   "ratelimits": [
     { "name": "CREATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
     { "name": "READ_LIMITER", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } }
@@ -30,7 +33,9 @@
     { "pattern": "skrytka.radek.sh", "custom_domain": true }
   ],
   "vars": {
-    "MAX_NOTE_BYTES": "65536"
+    "MAX_NOTE_BYTES": "65536",
+    "MAX_UPLOAD_BYTES": "10485760",
+    "FILE_QUOTA_BYTES": "5368709120"
   },
   "observability": {
     "enabled": true,

@@ -45,3 +45,24 @@ export async function decryptText({ iv, ciphertext }, rawKey) {
   }
   return new TextDecoder().decode(plaintext);
 }
+
+export async function encryptBytes(bytes, rawKey) {
+  const key = await importKey(rawKey, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: ALG, iv }, key, bytes));
+  const out = new Uint8Array(IV_BYTES + ciphertext.byteLength);
+  out.set(iv, 0);
+  out.set(ciphertext, IV_BYTES);
+  return out;
+}
+
+export async function decryptBytes(bytes, rawKey) {
+  if (bytes.byteLength < IV_BYTES + 16) throw new DecryptError();
+  try {
+    const key = await importKey(rawKey, ['decrypt']);
+    const iv = bytes.subarray(0, IV_BYTES);
+    return await crypto.subtle.decrypt({ name: ALG, iv }, key, bytes.subarray(IV_BYTES));
+  } catch {
+    throw new DecryptError();
+  }
+}

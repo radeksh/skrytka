@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { loadConfig } from '../server/config.js';
 import { buildApp } from '../server/app.js';
 
@@ -13,14 +16,17 @@ export const DENIED_IP = '203.0.113.7';
 
 export async function buildTestApp(overrides = {}) {
   const clock = { t: Date.parse('2026-01-01T00:00:00Z') };
+  const filesDir = mkdtempSync(join(tmpdir(), 'skrytka-test-'));
   const config = loadConfig({
     DB_PATH: ':memory:',
+    FILES_DIR: filesDir,
     LOG_LEVEL: 'silent',
     ...overrides
   });
   const app = await buildApp(config, { now: () => clock.t });
+  app.addHook('onClose', async () => rmSync(filesDir, { recursive: true, force: true }));
   await app.ready();
-  return { app, clock, config };
+  return { app, clock, config, filesDir };
 }
 
 export function postCreate(app, body = VALID_BODY, { remoteAddress = ALLOWED_IP, headers = {} } = {}) {

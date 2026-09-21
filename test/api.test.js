@@ -28,7 +28,8 @@ test('read returns the stored ciphertext and burns the note', async (t) => {
     ciphertext: VALID_BODY.ciphertext,
     iv: VALID_BODY.iv,
     burnAfterRead: true,
-    expiresAt: first.json().expiresAt
+    expiresAt: first.json().expiresAt,
+    file: null
   });
   assert.equal(first.headers['cache-control'], 'no-store');
 
@@ -44,7 +45,7 @@ test('info endpoint reports type without consuming the note', async (t) => {
   const { id } = (await postCreate(app)).json();
   const info = await app.inject({ method: 'GET', url: `/api/notes/${id}/info` });
   assert.equal(info.statusCode, 200);
-  assert.deepEqual(info.json(), { burnAfterRead: true, expiresAt: new Date(clock.t + 3_600_000).toISOString() });
+  assert.deepEqual(info.json(), { burnAfterRead: true, expiresAt: new Date(clock.t + 3_600_000).toISOString(), hasFile: false, fileSize: null });
   assert.equal(info.headers['cache-control'], 'no-store');
   assert.equal(app.db.countNotes(), 1);
   assert.equal(app.db.raw.prepare('SELECT read_count FROM notes WHERE id = ?').get(id).read_count, 0);

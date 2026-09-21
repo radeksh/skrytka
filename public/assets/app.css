@@ -80,6 +80,11 @@ input[readonly] { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, mo
 .checkbox label { margin: 0; font-weight: 500; }
 
 .copyrow { display: flex; gap: 8px; }
+.filerow { display: flex; gap: 8px; align-items: center; }
+.filerow input[type="file"] { flex: 1 1 auto; min-width: 0; padding: 8px; border: 1px dashed var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; font-size: 0.9rem; }
+.button-link { display: inline-block; margin-top: 8px; padding: 10px 16px; border-radius: 8px; background: var(--primary); color: var(--primary-text); font-weight: 600; text-decoration: none; }
+.button-link:hover { opacity: 0.9; }
+#fileBox { margin-top: 16px; }
 .copyrow input { flex: 1 1 auto; min-width: 0; }
 
 button {

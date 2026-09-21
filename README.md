@@ -11,6 +11,7 @@ Share passwords, tokens and other secrets with people. Skrytka encrypts the mess
 - **Link previews cannot burn a note.** The landing page is static and touches nothing. The ciphertext is fetched only after the recipient clicks a button, so chat clients, mail scanners and sandboxes that follow links do not consume one-time notes.
 - **Burn after reading, done atomically.** A one-time note is deleted in the same SQL statement that reads it. Two concurrent readers get exactly one success.
 - **Split delivery.** The sender gets the full link and, separately, the bare key. Send the link over one channel and the key over another; the recipient pastes the key into the page.
+- **Attachments.** One file per note (10 MB by default), encrypted in the browser with the same key. The file name and type travel inside the encrypted envelope, so the server stores an opaque blob and knows only its size. Downloads go through single-use tokens issued when the note is read, so a one-time note stays one-time.
 
 ## Security model
 
@@ -18,7 +19,7 @@ Share passwords, tokens and other secrets with people. Skrytka encrypts the mess
 - Keys are per note, 32 random bytes from `crypto.getRandomValues`, 12-byte IV, 128-bit GCM tag.
 - The note page `/<uuid>` is static. On load it only asks `/api/notes/<uuid>/info` whether the note is one-time, which never consumes it.
 - "Does not exist", "expired" and "already read" all return the same `404`.
-- Consuming a one-time note is a single `DELETE ... RETURNING`.
+- Consuming a one-time note is a single `DELETE ... RETURNING`. Its attachment is served once through a short-lived token and then deleted.
 - Strict CSP without inline scripts or styles, `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, no CORS.
 
 ## How it works
@@ -33,16 +34,17 @@ Share passwords, tokens and other secrets with people. Skrytka encrypts the mess
 
 Two interchangeable server layers share the same frontend in `public/`.
 
-**Container** (Node.js, SQLite in `/data`): configuration through environment variables, see `.env.example`.
+**Container** (Node.js, SQLite and attachments in `/data`): configuration through environment variables, see `.env.example`.
 
 ```bash
 docker run -d -p 3000:3000 -v skrytka-data:/data ghcr.io/radeksh/skrytka:latest
 ```
 
-**Cloudflare Workers** (D1, Static Assets): this is how the public instance runs. Per-IP rate limiting and a cron purge of expired notes are configured in `wrangler.jsonc`. On the Workers Free plan there is no overage billing; past the daily limits requests fail instead of generating cost.
+**Cloudflare Workers** (D1 for notes, R2 for attachments, Static Assets): this is how the public instance runs. Per-IP rate limiting and a cron purge of expired notes and attachments are configured in `wrangler.jsonc`. On the Workers Free plan there is no overage billing for Workers and D1; past the daily limits requests fail instead of generating cost. R2 bills above its free 10 GB, so the Worker enforces a hard storage cap (`FILE_QUOTA_BYTES`, 5 GB by default) and refuses uploads beyond it.
 
 ```bash
 npx wrangler d1 create skrytka        # once; paste database_id into wrangler.jsonc
+npx wrangler r2 bucket create skrytka-files
 npx wrangler d1 migrations apply skrytka --remote
 npx wrangler deploy
 ```

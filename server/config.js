@@ -1,5 +1,6 @@
+import { dirname, join } from 'node:path';
 import { parseCidrList } from './allowlist.js';
-import { GCM_TAG_BYTES } from '../shared/constants.js';
+import { FILE_OVERHEAD_BYTES, FRAME_HEADER_BYTES, FRAME_META_MAX_BYTES, GCM_TAG_BYTES } from '../shared/constants.js';
 
 const LOG_LEVELS = new Set(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']);
 
@@ -31,16 +32,23 @@ export function loadConfig(env = process.env) {
 
   const maxNoteBytes = readInt(env, 'MAX_NOTE_BYTES', 65_536, { min: 64, max: 8_388_608 });
   const maxCiphertextB64Length = Math.ceil(((maxNoteBytes + GCM_TAG_BYTES) * 4) / 3);
+  const maxUploadBytes = readInt(env, 'MAX_UPLOAD_BYTES', 10_485_760, { min: 0, max: 1_073_741_824 });
+  const dbPath = env.DB_PATH || './data/skrytka.db';
+  const filesDir = env.FILES_DIR || (dbPath === ':memory:' ? join(process.cwd(), 'data', 'files') : join(dirname(dbPath), 'files'));
 
   return Object.freeze({
     port: readInt(env, 'PORT', 3000, { min: 1, max: 65_535 }),
     host: env.HOST || '0.0.0.0',
-    dbPath: env.DB_PATH || './data/skrytka.db',
+    dbPath,
+    filesDir,
     createAllowedCidrs: readCidrs(env, 'CREATE_ALLOWED_CIDRS'),
     trustProxy: readCidrs(env, 'TRUST_PROXY'),
     maxNoteBytes,
     maxCiphertextB64Length,
     bodyLimit: maxCiphertextB64Length + 1024,
+    maxUploadBytes,
+    uploadBodyLimit: FRAME_HEADER_BYTES + FRAME_META_MAX_BYTES + maxUploadBytes + FILE_OVERHEAD_BYTES,
+    fileQuotaBytes: readInt(env, 'FILE_QUOTA_BYTES', 5_368_709_120, { min: 0, max: 1_099_511_627_776 }),
     cleanupIntervalMs: readInt(env, 'CLEANUP_INTERVAL_MS', 60_000, { min: 1000, max: 86_400_000 }),
     logLevel
   });
