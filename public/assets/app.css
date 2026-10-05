@@ -131,3 +131,15 @@ pre {
 .error { color: var(--error); font-weight: 600; margin: 12px 0 0; }
 .ok { color: var(--ok); font-weight: 600; margin: 8px 0 0; }
 .hidden { display: none !important; }
+
+.footer {
+  max-width: 680px;
+  margin: 16px auto 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.footer a { color: var(--muted); text-decoration: underline; }
+.footer a:hover { color: var(--primary); }
+.footer .made { white-space: nowrap; }
+.footer .flag { vertical-align: -1px; margin-left: 4px; border: 1px solid var(--border); border-radius: 2px; }
